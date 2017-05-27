@@ -214,22 +214,31 @@ def process_data(threadName, q):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-    path = sys.argv[1] if len(sys.argv) > 1 else '.'
-    event_handler = LoggingEventHandler()
-    observer = Observer()
-    observer.schedule(event_handler, path, recursive=True)
-    observer.start()
-    thread = myThread(1, "Sync_guy", workQueue)
-    thread.start()
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+     
+#     logging.basicConfig(level=logging.INFO,
+#                         format='%(asctime)s - %(message)s',
+#                         datefmt='%Y-%m-%d %H:%M:%S')
+#     path = sys.argv[1] if len(sys.argv) > 1 else '.'
+#     event_handler = LoggingEventHandler()
+#     observer = Observer()
+#     observer.schedule(event_handler, path, recursive=True)
+#     observer.start()
+#     thread = myThread(1, "Sync_guy", workQueue)
+#     thread.start()
+#     try:
+#         while True:
+#             time.sleep(1)
+#     except KeyboardInterrupt:
+#         observer.stop()
+#     observer.join()
+
+    rootdir = '/home/piyush/Drive'
+
+    for subdir, dirs, files in os.walk(rootdir):
+        print subdir
+        for file in files:
+            print os.path.join(subdir, file)
+
 
 
 

@@ -19,7 +19,7 @@ import sys
 from mimetypes import MimeTypes
 import urllib
 from apiclient import errors
-import Script
+
 from watchdog.events import FileSystemEventHandler
 from watchdog.events import LoggingEventHandler
 import Queue
@@ -27,6 +27,7 @@ import threading
 import time
 from watchdog.observers import Observer
 from mercurial.util import readfile
+from mercurial.templater import sub
 
 #26 May - send all changes from system to drive
 
@@ -356,12 +357,14 @@ class Action:
             
     def __init__(self, src_path, dest_path, is_dir, status):
         
-        print('Action is ' + status)
+        
         file_path = None
         if status == 'moved' or status == 'modified':
             file_path = dest_path
+            print('Action  '+ dest_path +' '+ status)
         else:
             file_path = src_path
+            print('Action  '+ src_path +' '+ status)
             
         if ((os.path.basename(file_path)).startswith('.')):
             return
@@ -376,9 +379,8 @@ class Action:
         
         
         #change in drive
-        print('here')
-#         queueLock.acquire()
-        print('here2')
+#           queueLock.acquire()
+      
         workQueue.put(report[file_path])
 #         queueLock.release()
         
@@ -423,14 +425,14 @@ def process_data(threadName, q):
 #         queueLock.acquire()
         if not workQueue.empty():
             file = q.get()
-            print('thread performing ' + file['status'] )
+            print('thread performing ' + file['status'] + ' on ' + file['name'])
             report = dict()
             report = readFile('/home/piyush/Drive/.report')
             
 #             send file to drive
             parent_id = getParentid(report, file['name'])
             if parent_id == None:
-                print('parent_id not found')
+                print('parent_id not found for ' + file['name'])
 #                 queueLock.release()
                 
                 continue
@@ -464,11 +466,20 @@ def process_data(threadName, q):
                 file_id = uploadfile(service, os.path.basename(file['name']), None, mime, file['name'],parent_id) 
                 report[file['name']]['is_synced'] = True
                 report[file['name']]['driveid'] = file_id
+            elif file['status'] == 'self-created' and file['is_synced'] == False:
+                trashDriveFile(service, file['driveid'])
+                if file['is_dir'] == False:
+                    file_id = uploadfile(service, os.path.basename(file['name']), None, mime, file['name'],parent_id) 
+                else:
+                    file_id = createDriveFolder(service, os.path.basename(file['name']), parent_id) 
+                report[file['name']]['is_synced'] = True
+                report[file['name']]['driveid'] = file_id
+ 
             
             writeFile('/home/piyush/Drive/.report', json.dumps(report))
             
 #             queueLock.release()
-            print ("%s processing %s" % (threadName, file['name'] +' ' +file['status']))
+            print ("%s processed %s" % (threadName, file['name'] +' ' +file['status']))
 #         else:
 #             queueLock.release()
         time.sleep(1)      
@@ -496,6 +507,34 @@ def getParentid(report, path):
     
     return None
 
+def syncDB():
+    report = dict()
+    report = readFile('/home/piyush/Drive/.report')
+    rootdir = folder_path
+    
+    for subdir, dirs, files in os.walk(rootdir):
+        
+        print ('Dir  - ' + subdir)
+        if report.has_key(subdir):
+            file = report[subdir]
+            if file['is_synced']==False:
+                Action(subdir, None, True,'self-created') 
+        else:
+            Action(subdir, None, True,'created')          
+               
+        for file in files:
+           
+            if not str(file).startswith('.'):
+                print (os.path.join(subdir, file))
+                file_path = os.path.join(subdir, file)
+                if report.has_key(file_path):
+                    file = report[file_path]
+                    if file['is_synced']==False:
+                        Action(file_path, None, False,'self-created') 
+                else:   
+                    Action(file_path, None, False,'created')          
+        
+    
 
 def main():
 
@@ -513,7 +552,12 @@ def main():
 #         print('Files:')
 #         for item in items:
 #             print('{0} ({1})'.format(item['name'], item['id']))
-#     
+#    
+     report = dict()
+     report = readFile('/home/piyush/Drive/.report')  
+     report['/home/piyush/Drive'] = File('/home/piyush/Drive', 'upload', 'created', '0BxW128bZHQogWWVRb3l3eXg1RVk' , None, True, True).__dict__
+     writeFile('/home/piyush/Drive/.report', json.dumps(report))  
+ 
     
      if options.folder:
         createDriveFolder(service)
@@ -527,13 +571,10 @@ def main():
      if options.report:
          createreport(service, os.path.join(home_dir, 'Drive')) 
      if options.sync:
-         sync(service, os.path.join(home_dir, 'Drive')) 
+         syncDB() 
          
       
-     report = dict()
-     report = readFile('/home/piyush/Drive/.report')  
-     report['/home/piyush/Drive'] = File('/home/piyush/Drive', 'upload', 'created', '0BxW128bZHQogWWVRb3l3eXg1RVk' , None, True, True).__dict__
-     writeFile('/home/piyush/Drive/.report', json.dumps(report))    
+       
          
 
 if __name__ == '__main__':
