@@ -532,7 +532,41 @@ def syncDB():
                     if file['is_synced']==False:
                         Action(file_path, None, False,'self-created') 
                 else:   
-                    Action(file_path, None, False,'created')          
+                    Action(file_path, None, False,'created')   
+                    
+def retrieve_all_changes(service, start_change_id=None):
+  """Retrieve a list of Change resources.
+
+  Args:
+    service: Drive API service instance.
+    start_change_id: ID of the change to start retrieving subsequent changes
+                     from or None.
+  Returns:
+    List of Change resources.
+  """
+  response = service.changes().getStartPageToken().execute()
+  print ('Start token: %s' % response.get('startPageToken'))
+  
+  result = []
+  page_token = None
+  while True:
+    try:
+      param = {}
+      if start_change_id:
+        param['startChangeId'] = start_change_id
+        
+      param['pageToken'] = response.get('startPageToken')
+      changes = service.changes().list(**param).execute()
+      print(json.dumps(changes))
+      result.extend(changes['items'])
+      page_token = changes.get('nextPageToken')
+      if not page_token:
+        break
+    except errors.HttpError, error:
+      print ('An error occurred: %s' % error)
+      break
+  print(json.loads(result))
+  return result       
         
     
 
@@ -552,12 +586,15 @@ def main():
 #         print('Files:')
 #         for item in items:
 #             print('{0} ({1})'.format(item['name'], item['id']))
-#    
+
+#      retrieve_all_changes(service)
+#      sys.exit()
+     
      report = dict()
      report = readFile('/home/piyush/Drive/.report')  
      report['/home/piyush/Drive'] = File('/home/piyush/Drive', 'upload', 'created', '0BxW128bZHQogWWVRb3l3eXg1RVk' , None, True, True).__dict__
      writeFile('/home/piyush/Drive/.report', json.dumps(report))  
- 
+     syncDB()
     
      if options.folder:
         createDriveFolder(service)
@@ -571,7 +608,7 @@ def main():
      if options.report:
          createreport(service, os.path.join(home_dir, 'Drive')) 
      if options.sync:
-         syncDB() 
+          syncDB()
          
       
        
